@@ -1,0 +1,1844 @@
+{
+  "info": {
+    "_postman_id": "354721d2-b63e-4067-b375-5e055cde0eb0",
+    "name": "BETA - Commercial API 2.0",
+    "description": "Zipwhip provides cloud-based texting services to new and existing phone lines. Many customers prefer texting to calling and the following commands will allow you to programmatically communicate with these customers.\n\nThe intended audience for this document is software developers who are responsible for using Zipwhip\u2019s API to add text-messaging functionality to their product, system, or network.\n\nFor additional Zipwhip API documentation please download the [Messaging API Reference PDF](https://www.zipwhip.com/wp-content/uploads/2018/01/MessagingAPIReference.pdf).\n\n\n---\n\n# Getting Started\n\nIf you do not already have an API-enabled Zipwhip account please visit https://www.zipwhip.com/api/ to get a username and password.\n\nIf you are using the Zipwhip API for the first time please start by using the [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f) call to generate a session key. A session key is required for all messaging API calls to authenticate the user and phone line. A unique session key is required for every phone line that you wish to use (if you use multiple lines). The session key does not expire so make sure to record it. \n \nOnce you have created a session key you have access to all the messaging API calls. Start with a simple one to make sure that everything is setup properly. For example, you can send yourself a message using [Message/Send](#7d1a0efe-7d35-4bb8-b333-3ca08f9519dc).\n\n---\n\n# Single-User vs. Multi-User Authentication\n\nThe Zipwhip Messaging API supports both single-user and multi-user authentication. They have different login requirements and allow for a different number of API user types.\n\n## Single-User Authentication\n\nSingle-user authentication means that there is a single username and password assigned to the line. Logging in with this username and password starts a session that has full administrative access. All users who share the account will be administrators.\n\nThe username for single-user logins must be the text-enabled phone number. The following is an example of a single-user login request:\n\n```curl\n$ curl -X POST \\\n  https://api.zipwhip.com/user/login \\\n  -d username=5556661234 \\\n  -d password=mypassword\n```\n\n## Multi-User Authentication\n\nMulti-user authentication means that there are several tiers of authentication. Each text-enabled line can be assigned only a single phone number, but it can be assigned multiple usernames and multiple passwords. In a multi-user scenario, you can authenticate as:\n\n**System** - Uses the phone number assigned to the line and the account password to log in. As the System, you have full administrative rights. The system is meant only to perform administrative tasks, update software, or troubleshoot system issues. There is no username associated with a system session.\n\n**Administrator** - The Admin username is a combination of a personal prefix and the phone number assigned to the line as the suffix: scott@5556661234. Admins have full administrative rights, the same rights as when you log in as the System. However, a username is associated with the session.\n\n**Operator** - The Operator username is the same format as the Admin username. Operators have limited rights: they can send and receive messages. The Operator\u2019s username is associated with the session. This is the suggested session for sending/recieving text messages. You can create more operator accounts by logging into your web app, going to settings and then going to the operators section.\n\nThe following is an example of an Operator login request:\n\n```curl\n$ curl -X POST \\\n  https://api.zipwhip.com/user/login \\\n  -d username=scott@4255551212 \\\n  -d password=scottpassword\n```\n\n---\n\n# SMS vs. MMS\n\nThe Zipwhip API supports two types of message requests. `Message/Send` which uses SMS, and `Messaging/Send` which uses MMS. Each option comes with it's own set of pros and cons.\n\n**Zipwhip API Send Requests: Message/Messaging Comparison**\n\nFeature | SMS | MMS\n--- | --- | ---\nMaximum Bytes Per Message | 600 | 700\nSupports Emojis | True | True\nSupports Scheduled Messages | True | False\nSupports Signatures | True | False\nSupports Attachments | False | True\n\nWe can guarantee proper concatenation for SMS and MMS messages up to 600 characters. Some carriers allow devices to have settings so that they show SMS concatenation and will number each 160 character message. We cannot guarantee concatenation for MMS text messages larger than 700 characters as it depends on the carrier and device settings.\n\nIt is important to note some characters will take more than one byte to represent in a message. If you need additional space, messaging allows for attachments up to 1mb. You can use this space to send text files or images that properly communicate your otherwise too lengthy messages.\n\n---\n\n# Messages with Emojis\n\nIncluding emojis into your messages requires very specific encoding. The emoji codes must be in UTF-8 format and URL-encoded in the message body. For a full reference on emoji codes please visit [apps.timwhitlock.info](https://apps.timwhitlock.info/emoji/tables/unicode).\n\n\n```curl\n$ curl -X POST \\\n\t  https://api.zipwhip.com/message/send \\\n\t  -d 'body=I am sending an emoji!%20%F0%9F%98%80\n\t\t&contacts=2063988576\n\t\t&session=fc288789-54f4-4137-8f03-83e4ffec2d18:377265507'\n```\n\n---\n\n# Message Send Status Codes\n\nThe status codes listed in this section apply to all message-send scenarios, including single-contact, multiple-contact, scheduled messages, and image (MMS) messages.\n\nIf an error occurs when the text message is sent, an error message is returned that includes the status code. The status code can also be retrieved at a later date with a [Message/Get](#f4f858b9-67fa-4364-82e9-8984aca8e98c) call. The current list of status codes is shown in the table below:\n\n**Zipwhip API Status Codes: Message Not Sent**\n\nCode | Description | State | Retry\n--- | --- | --- | --- \n-1234 | Recipient sent \"STOP\" message, must send \"UNSTOP\" to resolve | Failure | No\n-855 | Internal Error | Failure | Yes\n-704 | Internal Error | Failure | No\n-703 | Internal Error - Bad argument (incorrect/invalid input) | Failure | No\n-700 | Internal Error | Failure | No\n-394 | Invalid Parameter Length | Failure | No\n-124 | Unable to Determine Carrier | Failure | No\n-1 | Unknown Error | Unknown | Yes\n\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "User/Login",
+          "_postman_id": "1299443e-76ad-4519-b203-b7034079adaf",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{username}}",
+                  "description": "For single-user accounts, the username is the phone number associated with the account (e.g. 2061234567). For multi-user accounts the username is a combination of a personal prefix plus the phone number separated by an @ sign (e.g. scott@5556661234). \n\nNote: US Domestic numbers are 10 digit numbers (e.g. 2061234567) while International numbers must be in E.164 format (e.g. +12061234567).",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{password}}",
+                  "description": "Password associated with Zipwhip enabled phone number.",
+                  "type": "text"
+                }
+              ],
+              "options": {
+                "urlencoded": {}
+              }
+            },
+            "url": "https://api.zipwhip.com/user/login",
+            "description": "User/Login takes a username and password and returns a session key in the parameter 'response'. A session key doesn't expire, so it is best to store the session key and use it for future calls with this account.\n\nIf you are using a multi-user account please visit [Single-User vs. Multi-User Authentication](#single-user-vs-multi-user-authentication) for details on the different multi-user login formats."
+          },
+          "response": [
+            {
+              "id": "dd652228-41e0-4939-8ab8-b1bab976e318",
+              "name": "User/Login",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/x-www-form-urlencoded",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "username",
+                      "value": "{{username}}",
+                      "description": "Generally is the number associated with the account. \nUS Domestic numbers are full, 10 digit numbers. Ex. 2061234567<br>\nInternational numbers must be in E.164 format. Ex. +12061234567",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "{{password}}",
+                      "description": "Password associated with Zipwhip enabled phone number.",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": "https://api.zipwhip.com/user/login"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Sep 2019 02:07:51 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 d8792dbd3191bbe722eba5b536b979c8.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19-C2"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "9VYRCqqPGq0cfnrJON4USo6g0-lCD_OIdaYR-yTOOgs3rTwinWfjcg=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": \"97935919-dc06-4e46-9da2-55bc69aadaa9:378265507\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "User/Logout",
+          "_postman_id": "9f5f0ad8-20f5-468f-8e1b-4ff3c0142482",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key that you would like to invalidate.\n\nThe session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire.",
+                  "type": "text"
+                }
+              ],
+              "options": {
+                "urlencoded": {}
+              }
+            },
+            "url": "https://api.zipwhip.com/user/logout",
+            "description": "Invalidates a given session key."
+          },
+          "response": [
+            {
+              "id": "28621e72-41bd-4ee6-99b4-b5812eb06f9a",
+              "name": "User/Logout",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "text/plain",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}",
+                      "description": "The session key that you would like to invalidate. The session key is the response from <a href=\"#d29cbd60-1236-b4d9-b58d-05ddd82da6fc\"><span>User/Login</span></a>.",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": "https://api.zipwhip.com/user/logout"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Sep 2019 02:41:22 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 aef00f14752da9aa504d392fd46eff94.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19-C2"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "_xZTGp8gUGppoGmS31ZUwy4C7gxpeSPYhrPY3nMZXk5MtwPj-BKGyg=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": null\n}"
+            }
+          ]
+        }
+      ],
+      "_postman_id": "51aeb1e9-6e0b-4295-9397-a3404ce0c9c1",
+      "description": "In order to interact with the Zipwhip API, you must first authenticate using the user/login API to generate a session key. You only need to do this once. The session key that is returned uniqely identifies the user and landline phone number and must be used to authenticate all other API requests.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "id": "28c72ff9-912c-484c-8702-14317952648d",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "id": "4ea3b934-3adc-44a1-9823-5990fee7cf05",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Send SMS",
+      "item": [
+        {
+          "name": "Message/Send",
+          "_postman_id": "ec629918-151f-4351-a7a5-08397ae8e898",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              },
+              {
+                "key": "",
+                "value": "",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire.",
+                  "type": "text"
+                },
+                {
+                  "key": "contacts",
+                  "value": "{{contact_id}}",
+                  "description": "The String representation of a phone number. To send to multiple contacts, include multiple phone numbers separated by commas. A maximum of 50 phone numbers is allowed.\n\nUS Domestic numbers are 10 digit numbers (e.g. 2061234567) while International numbers must be in E.164 format (e.g. +12061234567).",
+                  "type": "text"
+                },
+                {
+                  "key": "body",
+                  "value": "{{body}}",
+                  "description": "The message to be sent. The message body can be a maximum of 600 bytes.",
+                  "type": "text"
+                },
+                {
+                  "key": "scheduledDate",
+                  "value": "{{scheduled_date}}",
+                  "description": "OPTIONAL: The time/date at which the message will be sent. If the time has already past or the field is left blank the message will be sent immediately. The value should be the Pacific epoch time in milliseconds. \n\nTo test this request you can visit [EpochConverter](https://www.epochconverter.com) and calculate your desired scheduledDate.",
+                  "type": "text",
+                  "disabled": true
+                }
+              ],
+              "options": {
+                "urlencoded": {}
+              }
+            },
+            "url": "https://api.zipwhip.com/message/send",
+            "description": "Sends a (SMS) text message to one or more contacts."
+          },
+          "response": [
+            {
+              "id": "9085ec0a-aa57-4806-8221-c983d90ccfcd",
+              "name": "Message/Send",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/x-www-form-urlencoded",
+                    "type": "text"
+                  },
+                  {
+                    "key": "",
+                    "value": "",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}",
+                      "description": "The session key is the response from  [User/Login](#c1d356c8-f6cd-4487-9742-4c179e66531f). It does not expire.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "contacts",
+                      "value": "{{contact_id}}",
+                      "description": "The String representation of a phone number. To send to multiple contacts, include multiple phone numbers separated by commas. A maximum of 50 phone numbers is allowed.\n\nUS Domestic numbers are 10 digit numbers (e.g. 2061234567) while International numbers must be in E.164 format (e.g. +12061234567).",
+                      "type": "text"
+                    },
+                    {
+                      "key": "body",
+                      "value": "{{body}}",
+                      "description": "The message to be sent. The message body can be a maximum of 600 bytes.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "scheduledDate",
+                      "value": "{{scheduled_date}}",
+                      "description": "OPTIONAL: The time/date at which the message will be sent. If the time has already past or the field is left blank the message will be sent immediately. The value should be the Pacific epoch time in milliseconds. \n\nTo test this request you can visit [EpochConverter](https://www.epochconverter.com) and calculate your desired scheduledDate.",
+                      "type": "text",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "url": "https://api.zipwhip.com/message/send"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 24 Dec 2019 00:51:35 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 97971aa6c140e2dfc8adaee6c929eedc.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "IAD89-C3"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "XV1jaxR4zNV0fTFWQOkjju7sLVBfGLQvQpsUHGZGHZ2r-uO9HMJaGA=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": {\n        \"root\": \"1209275391895461888\",\n        \"fingerprint\": \"1514465037\",\n        \"tokens\": [\n            {\n                \"contact\": 14543967707,\n                \"fingerprint\": \"1514465037\",\n                \"message\": \"1209275391895461888\",\n                \"device\": 377265507\n            }\n        ]\n    }\n}"
+            }
+          ]
+        }
+      ],
+      "_postman_id": "5dce675c-52c3-4664-b055-de603dd15caf",
+      "description": "The Zipwhip API supports two types of message requests -- SMS and MMS. This section describes how to send SMS Messages. For more info, see [SMS vs. MMS](#sms-vs-mms).",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "id": "7f76279b-00e0-4999-9420-ed20b3f64b24",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "id": "4ce37e47-d228-408f-b0ef-b795459f5329",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Send MMS",
+      "item": [
+        {
+          "name": "Messaging/Send - File Attachment",
+          "_postman_id": "5cfdee77-bc79-41c5-8036-0a4a432c9edd",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "description": "The recipient\u2019s phone number in E.164 format (e.g. +12061234567). To send to multiple contacts, include multiple phone numbers separated by commas. A maximum of 50 phone numbers is allowed.",
+                  "key": "to",
+                  "type": "text",
+                  "value": "{{to}}"
+                },
+                {
+                  "description": "The message to be sent. The message body can be a maximum of 700 bytes.",
+                  "key": "body",
+                  "type": "text",
+                  "value": "{{body}}"
+                },
+                {
+                  "description": "The  file attachment. Attachments can be added in .jpg, .png, .gif and .txt formats. You can send up to two attachments at a time. The maximum payload for a message is 600kb.\n\n",
+                  "key": "file",
+                  "type": "file",
+                  "src": "image.png"
+                }
+              ],
+              "options": {
+                "formdata": {}
+              }
+            },
+            "url": {
+              "raw": "https://api.zipwhip.com/messaging/send?session={{session_key}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "zipwhip",
+                "com"
+              ],
+              "path": [
+                "messaging",
+                "send"
+              ],
+              "query": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire."
+                }
+              ]
+            },
+            "description": "Sends an MMS message to one or more contacts with an uploaded file attachment.\n\nThis method uses a Body type of form-data for uploading a file attachment. Take note that the `session` key must be included as a url parameter."
+          },
+          "response": [
+            {
+              "id": "7a731125-bf76-453a-a635-dce3ac188b07",
+              "name": "Messaging/Send",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "text/plain",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "description": "The recipient\u2019s phone number in E.164 format (e.g. +12061234567). To send to multiple contacts, include multiple phone numbers separated by commas. A maximum of 50 phone numbers is allowed.",
+                      "key": "to",
+                      "type": "text",
+                      "value": "{{to}}"
+                    },
+                    {
+                      "key": "body",
+                      "value": "{{body}}",
+                      "description": "The message to be sent. The message body can be a maximum of 700 bytes.",
+                      "type": "text"
+                    },
+                    {
+                      "description": "The  file attachment. Attachments can be added in .jpg, .png, .gif and .txt formats. Messaging can send up to two attachments at a time. The maximum payload for a message is 600kb.\n\n",
+                      "key": "file",
+                      "type": "file",
+                      "src": [
+                        "image.jpg"
+                      ]
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "https://api.zipwhip.com/messaging/send?session={{session_key}}",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "zipwhip",
+                    "com"
+                  ],
+                  "path": [
+                    "messaging",
+                    "send"
+                  ],
+                  "query": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 26 Dec 2019 23:27:00 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 e36ab1b8726f47aa5adc8e19e66d1bbe.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19-C2"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "ByEDu0LPUF1O0niYdFNThCgA0WjRmkxOz15A6RTAJXlduXtGPhuMJQ=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": {\n        \"keys\": [\n            {\n                \"value\": \"1741b79c-1620-4b64-8f0e-4a949f204bf4\"\n            },\n            {\n                \"value\": \"51703c33-31ed-45c9-bdcf-29b29db4a506\"\n            }\n        ],\n        \"id\": 1210341272125743104,\n        \"status\": \"queued\"\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Messaging/Send - Hosted Content",
+          "_postman_id": "cb24f9ae-ff98-4eff-b8ba-c1a1b55b3317",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire.",
+                  "key": "session",
+                  "type": "text",
+                  "value": "{{session_key}}"
+                },
+                {
+                  "description": "The recipient\u2019s phone number in E.164 format (e.g. +12061234567). To send to multiple contacts, include multiple phone numbers separated by commas. A maximum of 50 phone numbers is allowed.",
+                  "key": "to",
+                  "type": "text",
+                  "value": "{{to}}"
+                },
+                {
+                  "description": "The message body text to be sent. The message body text can be a maximum of 700 bytes.",
+                  "key": "body",
+                  "type": "text",
+                  "value": "{{body}}"
+                },
+                {
+                  "description": "The key of the file attachment hosted on Zipwhip. Attachments in .jpg, .png, .gif and .txt formats can be stored on Zipwhip's servers using the `HostedContact/Save` method, which responds with a content key used to identify the url of the hosted content.",
+                  "key": "key",
+                  "type": "text",
+                  "value": "{{storageKey}}"
+                }
+              ],
+              "options": {
+                "urlencoded": {}
+              }
+            },
+            "url": "https://api.zipwhip.com/messaging/send",
+            "description": "Sends an MMS message to one or more contacts that references a file attachement hosted on Zipwhip's servers.\n\nThis method is most useful for cases where the same file will be sent many times, as it prevents the need to upload the file every time the attachment is used. To use this method, the file must first be stored on Zipwhip's servers using the `HostedContent/Save` API, which responds with a conent `key` used to identify the url of the hosted content."
+          },
+          "response": [
+            {
+              "id": "433aa441-be2c-4bae-b801-584e248a1df9",
+              "name": "Messaging/Send",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "text/plain",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "description": "The recipient\u2019s phone number in E.164 format (e.g. +12061234567). To send to multiple contacts, include multiple phone numbers separated by commas. A maximum of 50 phone numbers is allowed.",
+                      "key": "to",
+                      "type": "text",
+                      "value": "{{to}}"
+                    },
+                    {
+                      "key": "body",
+                      "value": "{{body}}",
+                      "description": "The message to be sent. The message body can be a maximum of 700 bytes.",
+                      "type": "text"
+                    },
+                    {
+                      "description": "The  file attachment. Attachments can be added in .jpg, .png, .gif and .txt formats. Messaging can send up to two attachments at a time. The maximum payload for a message is 600kb.\n\n",
+                      "key": "file",
+                      "type": "file",
+                      "src": [
+                        "image.jpg"
+                      ]
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "https://api.zipwhip.com/messaging/send?session={{session_key}}",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "zipwhip",
+                    "com"
+                  ],
+                  "path": [
+                    "messaging",
+                    "send"
+                  ],
+                  "query": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 26 Dec 2019 23:27:00 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 e36ab1b8726f47aa5adc8e19e66d1bbe.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19-C2"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "ByEDu0LPUF1O0niYdFNThCgA0WjRmkxOz15A6RTAJXlduXtGPhuMJQ=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": {\n        \"keys\": [\n            {\n                \"value\": \"1741b79c-1620-4b64-8f0e-4a949f204bf4\"\n            },\n            {\n                \"value\": \"51703c33-31ed-45c9-bdcf-29b29db4a506\"\n            }\n        ],\n        \"id\": 1210341272125743104,\n        \"status\": \"queued\"\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "HostedContent/Save",
+          "_postman_id": "1871d473-b6c1-4e5b-ad9f-891c66baf38e",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "description": "Image to be uploaded",
+                  "key": "image",
+                  "type": "file",
+                  "src": "image.png"
+                }
+              ],
+              "options": {
+                "formdata": {}
+              }
+            },
+            "url": {
+              "raw": "https://api.zipwhip.com/hostedContent/save?session={{session_key}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "zipwhip",
+                "com"
+              ],
+              "path": [
+                "hostedContent",
+                "save"
+              ],
+              "query": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire."
+                }
+              ]
+            },
+            "description": "HostedContent/Save stores a file to the Zipwhip servers. This method is useful for cases where the same file will be sent many times, as it prevents the need to upload the file every time the attachment is used.\n\nHostedContent/Save responds with a url key to be used with the `Messaging/Send - Hosted Content` call, allowing for attachments sent directly from Zipwhip.\n\nThis method uses a Body type of form-data for uploading a file attachment. Take note that the `session` key must be included as a url parameter."
+          },
+          "response": [
+            {
+              "id": "68214429-5f0d-4c02-b019-32c35749d2aa",
+              "name": "HostedContent/Save",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "type": "text",
+                    "value": "text/plain"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "description": "Image to be uploaded",
+                      "key": "image",
+                      "type": "file",
+                      "src": [
+                        "image.jpg"
+                      ]
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "https://api.zipwhip.com/hostedContent/save?session={{session_key}}",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "zipwhip",
+                    "com"
+                  ],
+                  "path": [
+                    "hostedContent",
+                    "save"
+                  ],
+                  "query": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}",
+                      "description": "The session key is the response from  [User/Login](#013ae59c-25cf-4987-826f-8925913a9be1). It does not expire."
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 27 Dec 2019 00:22:52 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 1f6e68152880a39d72e6bf2996cd6a61.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19-C1"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "zMde-jNnnz1wiqa-RYA7_YQC4CB0kYtVkCNwbx5exW9QPZzxlmuklg=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": {\n        \"url\": \"ab5fbd5e-8349-4ad8-b96c-6c3452a47d02\"\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "HostedContent/Get",
+          "_postman_id": "28598da4-bfd4-48d8-9595-9d9338476831",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "https://api.zipwhip.com/hostedContent/get?session={{session_key}}&storageKey={{storageKey}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "zipwhip",
+                "com"
+              ],
+              "path": [
+                "hostedContent",
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire."
+                },
+                {
+                  "key": "storageKey",
+                  "value": "{{storageKey}}",
+                  "description": "The key of the file attachment hosted on Zipwhip. Attachments in .jpg, .png, .gif and .txt formats can be stored on Zipwhip's servers using the `HostedContact/Save` method, which responds with a conent key used to identify the url of the hosted content. The storageKey for an uploaded image can also be retrived using the `MessageAttachment/List` call."
+                }
+              ]
+            },
+            "description": "Returns the attachment associated with the provided storage key.\n\nThe storage key is returned in the response to a `HostedContact/Save` or from the `MessageAttachment/List` call."
+          },
+          "response": [
+            {
+              "id": "ff6b0850-8d70-4948-84b3-747ff2574fb2",
+              "name": "HostedContent/Get",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.zipwhip.com/hostedContent/get?session={{session_key}}&storageKey={{storageKey}}",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "zipwhip",
+                    "com"
+                  ],
+                  "path": [
+                    "hostedContent",
+                    "get"
+                  ],
+                  "query": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}",
+                      "description": "The session key is the response from  [User/Login](#013ae59c-25cf-4987-826f-8925913a9be1). It does not expire."
+                    },
+                    {
+                      "key": "storageKey",
+                      "value": "{{storageKey}}",
+                      "description": "The key of the file attachment hosted on Zipwhip. Attachments in .jpg, .png, .gif and .txt formats can be stored on Zipwhip's servers using the `HostedContact/Save` method, which responds with a conent key used to identify the url of the hosted content. The storageKey for an uploaded image can also be retrived using the `MessageAttachment/List` call."
+                    }
+                  ]
+                }
+              },
+              "_postman_previewlanguage": "Text",
+              "header": [],
+              "cookie": [],
+              "responseTime": null,
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "MessageAttachment/List",
+          "_postman_id": "22dc06d1-4ec4-40a9-b9d3-87c9a82e2d4c",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://api.zipwhip.com/messageAttachment/list?session={{session_key}}&messageId=1222656048877146112",
+              "protocol": "https",
+              "host": [
+                "api",
+                "zipwhip",
+                "com"
+              ],
+              "path": [
+                "messageAttachment",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire."
+                },
+                {
+                  "key": "messageId",
+                  "value": "1222656048877146112"
+                }
+              ]
+            },
+            "description": "Returns the details of the attachment(s) for the provided message Id.\n\nThe `storageKey` returned for each attachment in this call can be used for sending messages using the `Message/Send - Hosted Content` call."
+          },
+          "response": [
+            {
+              "id": "3f903d6f-ed6b-4f3d-831c-a1ce8959b947",
+              "name": "MessageAttachment/List",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/x-www-form-urlencoded",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.zipwhip.com/messageAttachment/list?session={{session_key}}&messageId=1222656048877146112",
+                  "protocol": "https",
+                  "host": [
+                    "api",
+                    "zipwhip",
+                    "com"
+                  ],
+                  "path": [
+                    "messageAttachment",
+                    "list"
+                  ],
+                  "query": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}"
+                    },
+                    {
+                      "key": "messageId",
+                      "value": "1222656048877146112"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Wed, 29 Jan 2020 23:03:11 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Access-Control-Allow-Origin",
+                  "value": "*"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 f9d716a351f14a0ac1fac2449734849b.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19-C2"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "tRh9PxaaRo09M-x4lCRYbWMDHCvc33ILM8OSqpjPXAe1Oi4_PZCR7Q=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"total\": 2,\n    \"sessions\": null,\n    \"size\": 2,\n    \"success\": true,\n    \"response\": [\n        {\n            \"id\": 8595442707,\n            \"storageKey\": \"729d7c49-5c51-434d-8834-baa450bfb16d\",\n            \"messageType\": {\n                \"enumType\": \"com.zipwhip.website.data.dto.MessageType\",\n                \"name\": \"MO\"\n            },\n            \"deviceId\": 377265507,\n            \"dateCreated\": \"2020-01-29T23:01:32+00:00\",\n            \"mimeType\": \"image/png\",\n            \"fileSizeBytes\": 5878,\n            \"fileName\": \"image.png\",\n            \"new\": false,\n            \"lastUpdated\": null,\n            \"messageId\": 1222656048877146112,\n            \"class\": \"com.zipwhip.website.data.dto.MessageAttachment\",\n            \"version\": 0\n        },\n        {\n            \"id\": 8595442807,\n            \"storageKey\": \"0e758f85-4508-4cfc-a938-45fe236c60a8\",\n            \"messageType\": {\n                \"enumType\": \"com.zipwhip.website.data.dto.MessageType\",\n                \"name\": \"MO\"\n            },\n            \"deviceId\": 377265507,\n            \"dateCreated\": \"2020-01-29T23:01:32+00:00\",\n            \"mimeType\": \"text/plain\",\n            \"fileSizeBytes\": 24,\n            \"fileName\": \"text.txt\",\n            \"new\": false,\n            \"lastUpdated\": null,\n            \"messageId\": 1222656048877146112,\n            \"class\": \"com.zipwhip.website.data.dto.MessageAttachment\",\n            \"version\": 0\n        }\n    ]\n}"
+            }
+          ]
+        }
+      ],
+      "_postman_id": "50c748eb-19d0-4d96-9050-a7372900d1ae",
+      "description": "The Zipwhip API supports two types of message requests -- SMS and MMS. This section describes MMS Messages. For more info, see [SMS vs. MMS](#sms-vs-mms).\n\n## MMS File Attachments\n\nAttachments can be added to MMS messages in .jpg, .png, .gif and .txt formats. You can send up to two attachments at a time. The maximum payload for a message is 600kb.\n\nFiles can be sent in MMS messages using the following two methods:\n\n* **Message/Send - File Attachment** &mdash; The file is uploaded with the message. \n\n* **Message/Send - Hosted Content** &mdash; The file url is referenced in the message. This method is most useful for cases where the same file will be sent many times, as it prevents the need to upload the file every time the attachment is used. To use this method, the file must first be stored on Zipwhip's servers using the `HostedContent/Save` API, which responds with a content `key` used to identify the url of the hosted content.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "id": "41fa312e-c22e-4db3-92fe-4cdc9fac4ea1",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "id": "3cefda6c-e2df-4431-99b9-5a7e3b9e7f8c",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Settings",
+      "item": [
+        {
+          "name": "User/Get",
+          "_postman_id": "07010c54-bcf6-402c-997f-c28f773a82f8",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire.",
+                  "type": "text"
+                }
+              ],
+              "options": {
+                "urlencoded": {}
+              }
+            },
+            "url": "https://api.zipwhip.com/user/get",
+            "description": "Provides information on the account associated with the given session key."
+          },
+          "response": [
+            {
+              "id": "690e52f9-c45d-42f6-82bb-ff62054e1226",
+              "name": "User/Get",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/x-www-form-urlencoded",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}",
+                      "description": "The session key is the response from <a href=\"#d29cbd60-1236-b4d9-b58d-05ddd82da6fc\"><span>User/Login</span></a>. It does not expire.",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": "https://api.zipwhip.com/user/get"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Sep 2019 02:32:38 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 86412f0e9b1a62db53e7827b691fda1b.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "5SqPmZYMPBGbPHwqNWyrbmW5h1kv5Q5jjPkbVk59VZkvtXWmxkAyWw=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": {\n        \"settings\": {\n            \"contacts_autoAdd\": true,\n            \"signature_mode\": \"firstinitial\",\n\t\t\t...\n        },\n        \"user\": {\n            \"firstName\": \"Joe\",\n            \"lastName\": \"Smith\",\n            \"notes\": \"Notes go here\",\n            ...\n        },\n        \"operator\": {\n            \"owner\": false,\n            \"displayName\": \"Joe Smith\",\n            \"firstName\": \"Joe\",\n            \"lastName\": \"Smith\",\n            \"role\": {\n                \"roleId\": 2,\n                \"name\": \"Admin\",\n                \"description\": \"Admin operator\",\n                \"privilegeLevel\": 15,\n                \"scope\": \"LINE\",\n                \"mutable\": false,\n                \"permissions\": [\n                    {\n                        \"activityKey\": \"AccountConsole\",\n                        \"displayName\": \"Account Console Access\",\n                        \"description\": \"Ability to use the account console.\"\n                    },\n                    {\n                        \"activityKey\": \"CreateOperator\",\n                        \"displayName\": \"Create operator\",\n                        \"description\": \"Create a new operator in the team\"\n                    },\n                    {\n                        ...\n                    }\n                ]\n            },\n            ...\n        },\n        \"groups\": [\n            {\n                \"cachedContactsCount\": 50,\n                \"lastUpdated\": 1568860358294,\n                \"type\": \"Group\",\n                ...\n            },\n            {\n                \"cachedContactsCount\": 23,\n                \"lastUpdated\": 1568860358294,\n                \"type\": \"Group\",\n                ...\n            }\n        ]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "User/Save",
+          "_postman_id": "1965025d-aca5-4e7d-8cbe-05ba9338820c",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire.",
+                  "type": "text"
+                },
+                {
+                  "key": "firstName",
+                  "value": "{{firstName}}",
+                  "description": "OPTIONAL: The first name of the user being saved.",
+                  "type": "text"
+                },
+                {
+                  "key": "lastName",
+                  "value": "{{lastName}}",
+                  "description": "OPTIONAL:  The last name of the user being saved.",
+                  "type": "text"
+                },
+                {
+                  "key": "notes",
+                  "value": "{{notes}}",
+                  "description": "OPTIONAL: Notes about the user being saved.",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "{{email}}",
+                  "description": "OPTIONAL: Email associated with the user.",
+                  "type": "text"
+                }
+              ],
+              "options": {
+                "urlencoded": {}
+              }
+            },
+            "url": "https://api.zipwhip.com/user/save",
+            "description": "Save details about the user associated with the given session key."
+          },
+          "response": [
+            {
+              "id": "cf3d0154-7abd-4f6d-a200-afe3cda27457",
+              "name": "User/Save",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "text/plain",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}",
+                      "description": "The session key is the response from [User/Login](#013ae59c-25cf-4987-826f-8925913a9be1). It does not expire.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "firstName",
+                      "value": "Joe",
+                      "description": "OPTIONAL: The first name of the user being saved.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "lastName",
+                      "value": "Smith",
+                      "description": "OPTIONAL:  The last name of the user being saved.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "These are my notes",
+                      "description": "OPTIONAL: Notes about the user being saved.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "email",
+                      "value": "joe@example.com",
+                      "description": "OPTIONAL: Email associated with the user.",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": "https://api.zipwhip.com/user/save"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Sep 2019 02:26:11 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 86412f0e9b1a62db53e7827b691fda1b.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "FcKuSG00TMv7CNkPu1j5lVXW0U0mWMt2APCdkgdKM7fMSBeYBp6d6g=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": {\n        \"user\": {\n            \"birthday\": \"\",\n            \"lastName\": \"Smith\",\n            \"loc\": \"\",\n            \"phoneKey\": \"\",\n            \"notes\": \"These are my notes\",\n            \"mobileNumber\": \"2068163598\",\n            \"fullName\": \"Joe Smith\",\n            \"firstName\": \"Joe\",\n            \"lastUpdated\": 1568859971000,\n            \"carrier\": \"Zipwhip\",\n            \"phoneNumber\": \"2068163598\",\n            \"dateCreated\": 1535750689000,\n            \"email\": \"joe@example.com\"\n        }\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "User/Signature/Set",
+          "_postman_id": "e1d927ed-70e3-411d-8947-70a79f77829b",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "session",
+                  "value": "{{session_key}}",
+                  "description": "The session key is the response from  [User/Login](#629a849b-df6b-4d54-8976-51a670bffb5f). It does not expire.",
+                  "type": "text"
+                },
+                {
+                  "key": "signature",
+                  "value": "{{signature}}",
+                  "description": "The signature to be saved to the account.",
+                  "type": "text"
+                }
+              ],
+              "options": {
+                "urlencoded": {}
+              }
+            },
+            "url": "https://api.zipwhip.com/user/signature/set",
+            "description": "The User/Signature/Set call sets the signature for the specified account. The signature is an automated response that is included at the end of messages sent from this account.\n\nSignatures are only used with SMS messages. Additionally, the signature will not be included in messages if the character limit would be surpassed by including it."
+          },
+          "response": [
+            {
+              "id": "92b3fe82-1d66-4138-8c20-09479f82abc9",
+              "name": "User/Signature/Set",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/x-www-form-urlencoded",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "session",
+                      "value": "{{session_key}}",
+                      "description": "The session key is the response from  [User/Login](#013ae59c-25cf-4987-826f-8925913a9be1). It does not expire.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "signature",
+                      "value": "{{signature}}",
+                      "description": "The signature to be saved to the account.",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": "https://api.zipwhip.com/user/signature/set"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json;charset=UTF-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Server",
+                  "value": "nginx/1.17.3"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 19 Sep 2019 02:45:50 GMT"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "1; mode=block"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "X-Cache",
+                  "value": "Miss from cloudfront"
+                },
+                {
+                  "key": "Via",
+                  "value": "1.1 36810aa1793ee589dc8c194860296079.cloudfront.net (CloudFront)"
+                },
+                {
+                  "key": "X-Amz-Cf-Pop",
+                  "value": "SEA19-C2"
+                },
+                {
+                  "key": "X-Amz-Cf-Id",
+                  "value": "FenU6e7cwZC36z4ZgkskMwjxSJF08AOWCBWngZGkIl_qkZ00cGFvoA=="
+                }
+              ],
+              "cookie": [],
+              "responseTime": null,
+              "body": "{\n    \"success\": true,\n    \"response\": null\n}"
+            }
+          ]
+        }
+      ],
+      "_postman_id": "0a43d3c5-a4ee-4371-b699-e4ea710916f3",
+      "description": "The User methods are used for accessing account info.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "id": "1cf3f7d7-1079-46d4-a397-7d6dfd2cc325",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "id": "95c74f3b-c0ee-49d6-af3d-d4f8db8f8276",
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "id": "052955f9-1b8b-4131-9215-932ba8c3b3da",
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "id": "3fe2098a-b862-4b67-9ade-d91de6e5ecc4",
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ]
+}
